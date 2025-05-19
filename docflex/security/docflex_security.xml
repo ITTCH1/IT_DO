@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+<!-- 1. add category or model name -->
+<record id="medule_category_docflex" model="ir.module.category">
+    <field name="name">DocFlex</field>
+    <field name="sequence">32</field>
+</record>
+
+<record id="docflex_super_manager_group" model="res.groups">
+    <field name="name">docflex super managers</field>
+<field name="category_id" ref="medule_category_docflex"/>
+    <field name="users" eval="[(4, ref('base.user_root')),(4,
+ref('base.user_admin'))]"/>
+</record>
+<record id="docflex_manager_group" model="res.groups">
+    <field name="name">docflex managers </field>
+<field name="category_id" ref="medule_category_docflex"/>
+    <field name="users" eval="[(4, ref('base.user_root')),(4,
+ref('base.user_admin'))]"/>
+</record>
+<record id="docflex_user_group" model="res.groups">
+    <field name="name">docflex users</field>
+<field name="category_id" ref="medule_category_docflex"/>
+    <field name="users" eval="[(4, ref('base.user_root')),(4,
+ref('base.user_admin'))]"/>
+</record>
+
+</odoo>
