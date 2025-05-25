@@ -33,6 +33,7 @@
         'views/ticket_sections_views.xml',
         'views/ticket_status_views.xml',
         'views/ticket_priority_views.xml',
+        'views/ticket_type_views.xml',
         'views/ticket_summary_views.xml',
         'views/ticket_tag_views.xml',
         'views/ticket_security_views.xml',
