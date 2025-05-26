@@ -15,6 +15,10 @@ access_ticket_security_super_manager_group,docflex.super_manager.group,model_tic
 access_ticket_security_manager_group,docflex.manager.group,model_ticket_security,docflex.docflex_manager_group,1,1,1,1
 access_ticket_security_user_group,docflex.user.group,model_ticket_security,docflex.docflex_user_group,1,0,0,0
 
+access_ticket_type_super_manager_group,docflex.super_manager.group,model_ticket_type,docflex.docflex_super_manager_group,1,1,1,1
+access_ticket_type_manager_group,docflex.manager.group,model_ticket_type,docflex.docflex_manager_group,1,1,1,1
+access_ticket_type_user_group,docflex.user.group,model_ticket_type,docflex.docflex_user_group,1,0,0,0
+
 access_ticket_priority_super_manager_group,docflex.super_manager.group,model_ticket_priority,docflex.docflex_super_manager_group,1,1,1,1
 access_ticket_priority_manager_group,docflex.manager.group,model_ticket_priority,docflex.docflex_manager_group,1,1,1,1
 access_ticket_priority_user_group,docflex.user.group,model_ticket_priority,docflex.docflex_user_group,1,0,0,0

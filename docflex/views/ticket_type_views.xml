@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <odoo>
-<record id="docflex_ticket_type_view_tree" model="ir.ui.view">
+    <record id="docflex_ticket_type_view_tree" model="ir.ui.view">
         <field name="name">ticket.type.tree</field>
         <field name="model">ticket.type</field>
         <field name="arch" type="xml">
@@ -48,7 +48,7 @@
         </field>
         <field name="domain">[("id", "!=", False)]</field> 
     </record>
-    <menuitem id="docflex_ticket_type_menu" name="اولوليات المذكرات" parent="docflex_config_menue" action="docflex.action_docflex_ticket_type" groups="docflex.docflex_super_manager_group" sequence="1"/>
+    <menuitem id="docflex_ticket_type_menu" name="انواع المذكرات" parent="docflex_config_menue" action="docflex.action_docflex_ticket_type" groups="docflex.docflex_super_manager_group" sequence="1"/>
 
 
 </odoo>

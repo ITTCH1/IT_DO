@@ -57,6 +57,8 @@ class DoflexTicket(models.Model):
         comodel_name='ticket.security',
         ondelete='restrict',
     )
+    ticket_type = fields.Many2one('ticket.type', string="Ticket Type", 
+                                default=lambda self: self._get_default_ticket_type())
     ticket_status_id = fields.Many2one(
         string='حالة المذكرة',
         comodel_name='ticket.status',
@@ -116,6 +118,15 @@ class DoflexTicket(models.Model):
     legend_done = fields.Char(related='stage_id.legend_done', string='Kanban Valid Explanation', readonly=True, related_sudo=False)
     legend_normal = fields.Char(related='stage_id.legend_normal', string='Kanban Ongoing Explanation', readonly=True, related_sudo=False)
     
+
+    @api.model
+    def _get_default_ticket_type(self):
+        """Get the first available ticket_type with context support"""
+        code = self._context.get('code')
+        domain = [('code', '=', code)] if code else []
+        ticket_type = self.env['ticket.type'].search(domain, order='id asc', limit=1)
+        return ticket_type.id if ticket_type else False
+
     @api.depends('department_id')
     def _compute_domain_user_ids(self):
         for record in self:
