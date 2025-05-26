@@ -1,4 +1,5 @@
-from odoo import models , fields, api ,Command
+from odoo import models , fields, api ,Command, _
+from odoo.exceptions import ValidationError
 class DoflexTicket(models.Model):
     _name = 'docflex.ticket'
     # _inherit="helpdesk.ticket"
@@ -14,9 +15,19 @@ class DoflexTicket(models.Model):
   
     _description = 'المذكرات'
     _track_duration_field = 'stage_id'
+    _sql_constraints = [
+    ('number_unique', 'UNIQUE(number)', 'الرقم التسلسلي يجب أن يكون فريدًا!'),
+]
     
     name = fields.Char(string='الموضوع', required=True, index=True, tracking=True)
-    number=fields.Char("الرقم التسلسلي")
+
+    number = fields.Char(
+        string='الرقم التسلسلي',
+        required=True,
+        readonly=True,
+        default=lambda self: _('New'),
+        copy=False
+    )
     referrenc_number=fields.Char("رقم المرجع ")
     topic=fields.Text("البيان")
     note=fields.Text("الملاحظة")
@@ -43,8 +54,8 @@ class DoflexTicket(models.Model):
 
     
     ticket_section_id = fields.Many2one(
+        'ticket.section',
         string='قسم المذكرة',
-        comodel_name='ticket.section',
         ondelete='restrict',
     )
     ticket_priority_id = fields.Many2one(
@@ -118,6 +129,114 @@ class DoflexTicket(models.Model):
     legend_done = fields.Char(related='stage_id.legend_done', string='Kanban Valid Explanation', readonly=True, related_sudo=False)
     legend_normal = fields.Char(related='stage_id.legend_normal', string='Kanban Ongoing Explanation', readonly=True, related_sudo=False)
     
+    ticket_type_code = fields.Char(related='ticket_type.code', store=True)
+    ticket_section_code = fields.Selection(related='ticket_section_id.code', store=True)
+    sequence_year = fields.Char(compute='_compute_sequence_year', store=True)
+
+    # إضافة هذه الحقول في نموذج docflex.ticket
+    ticket_date_date = fields.Date(
+        string="تاريخ المذكرة (تاريخ فقط)",
+        compute='_compute_ticket_date_date',
+        store=True,
+        index=True
+    )
+
+    sequence_year = fields.Char(
+        string="سنة التسلسل",
+        compute='_compute_sequence_year',
+        store=True,
+        index=True
+    )
+
+    ticket_month = fields.Char(string="شهر التذكرة", compute="_compute_ticket_month", store=True)
+    ticket_week = fields.Char(string="أسبوع التذكرة", compute="_compute_ticket_week", store=True)
+
+    ticket_count = fields.Integer(string="عدد التذاكر", default=1, help="يُستخدم للعد في عرض Pivot")
+
+
+    is_today = fields.Boolean(compute="_compute_date_flags", store=True)
+    is_this_week = fields.Boolean(compute="_compute_date_flags", store=True)
+    is_this_month = fields.Boolean(compute="_compute_date_flags", store=True)
+
+    @api.depends('ticket_date')
+    def _compute_date_flags(self):
+        today = fields.Date.today()
+        for rec in self:
+            rec.is_today = rec.ticket_date.date() == today if rec.ticket_date else False
+            rec.is_this_week = rec.ticket_date.isocalendar()[1] == today.isocalendar()[1] if rec.ticket_date else False
+            rec.is_this_month = rec.ticket_date.month == today.month and rec.ticket_date.year == today.year if rec.ticket_date else False
+
+
+
+
+    @api.depends('ticket_date')
+    def _compute_ticket_month(self):
+        for record in self:
+            if record.ticket_date:
+                record.ticket_month = record.ticket_date.strftime('%m')
+            else:
+                record.ticket_month = False
+
+    @api.depends('ticket_date')
+    def _compute_ticket_week(self):
+        for record in self:
+            if record.ticket_date:
+                record.ticket_week = record.ticket_date.strftime('%U')  # الأسبوع في السنة
+            else:
+                record.ticket_week = False
+
+
+    @api.depends('ticket_date')
+    def _compute_ticket_date_date(self):
+        for record in self:
+            record.ticket_date_date = record.ticket_date.date() if record.ticket_date else False
+
+    @api.depends('ticket_date')
+    def _compute_sequence_year(self):
+        for record in self:
+            if record.ticket_date:
+                record.sequence_year = record.ticket_date.strftime('%Y')
+            else:
+                record.sequence_year = fields.Date.today().strftime('%Y')
+
+    @api.depends('ticket_date')
+    def _compute_sequence_year(self):
+        for record in self:
+            if record.ticket_date:
+                record.sequence_year = record.ticket_date.strftime('%Y')
+            else:
+                record.sequence_year = fields.Date.today().strftime('%Y')
+
+    @api.model
+    def _get_next_number(self):
+        """Generate next number based on ticket type, section and creation date"""
+        today = fields.Date.today()
+        year = today.strftime('%Y')
+        
+        if not self.ticket_type or not self.ticket_section_id:
+            return _('New')
+            
+        # بناء اسم التسلسل الديناميكي
+        sequence_code = f"docflex.ticket.{self.ticket_type.code}.{self.ticket_section_id.code or 'default'}.{year}"
+        
+        # البحث عن التسلسل أو إنشائه إذا لم يوجد
+        sequence = self.env['ir.sequence'].search([
+            ('code', '=', sequence_code),
+            ('company_id', '=', self.company_id.id)
+        ], limit=1)
+        
+        if not sequence:
+            sequence = self.env['ir.sequence'].create({
+                'name': f'Ticket Sequence - {self.ticket_type.name} - {self.ticket_section_id.name} - {year}',
+                'code': sequence_code,
+                'prefix': f"{self.ticket_type.code}/{self.ticket_section_id.code or 'GEN'}/%(year)s/",
+                'padding': 4,
+                'number_next': 1,
+                'number_increment': 1,
+                'company_id': self.company_id.id,
+            })
+        
+        return sequence.next_by_id()
 
     @api.model
     def _get_default_ticket_type(self):
@@ -187,14 +306,43 @@ class DoflexTicket(models.Model):
 
     @api.model
     def create(self, vals):
+        # 1. تعيين معلومات المستخدم (الوظيفة الأصلية)
         user = self.env.user
-        vals['user_id'] = user.id
-        vals['user_name'] = user.name
-        # تأكد أن لديك `hr.employee` مرتبط بـ `res.users`
+        vals.update({
+            'user_id': user.id,
+            'user_name': user.name,
+        })
+        
+        # 2. تعيين القسم من الموظف (الوظيفة الأصلية)
         employee = self.env['hr.employee'].search([('user_id', '=', user.id)], limit=1)
         if employee and employee.department_id:
             vals['department_id'] = employee.department_id.id
-        return super(DoflexTicket, self).create(vals)
+        
+        # 3. توليد الرقم التسلسلي (الوظيفة الجديدة)
+        if vals.get('number', _('New')) == _('New'):
+            # إنشاء كائن مؤقت للحصول على القيم المطلوبة للتسلسل
+            temp_vals = vals.copy()
+            
+            # تعيين القيم الافتراضية إذا لم يتم توفيرها
+            if 'company_id' not in temp_vals:
+                temp_vals['company_id'] = self.env.company.id
+            
+            temp_ticket = self.new(temp_vals)
+            vals['number'] = temp_ticket._get_next_number()
+        
+        # 4. التأكد من وجود القيم المطلوبة قبل الإنشاء
+        required_fields = ['ticket_type', 'ticket_section_id']
+        for field in required_fields:
+            if field not in vals:
+                raise ValidationError(_("حقل %s مطلوب لإنشاء المذكرة") % field)
+        
+        # 5. إنشاء المذكرة
+        ticket = super(DoflexTicket, self).create(vals)
+        
+        # 6. تسجيل في السجل (اختياري)
+        ticket.message_post(body=_("تم إنشاء المذكرة برقم %s") % ticket.number)
+        
+        return ticket
     # @api.depends('team_id')
     # def _compute_user_and_stage_ids(self):
     #     for ticket in self.filtered(lambda ticket: ticket.team_id):
@@ -249,3 +397,20 @@ class DoflexTicket(models.Model):
             },
         })
         return action
+
+    # إضافة فهارس لتحسين أداء البحث
+    def _auto_init(self):
+        res = super(DoflexTicket, self)._auto_init()
+        self._cr.execute("""
+            CREATE INDEX IF NOT EXISTS docflex_ticket_number_idx 
+            ON docflex_ticket (number)
+        """)
+        self._cr.execute("""
+            CREATE INDEX IF NOT EXISTS docflex_ticket_date_idx 
+            ON docflex_ticket (ticket_date)
+        """)
+        self._cr.execute("""
+            CREATE INDEX IF NOT EXISTS docflex_ticket_type_idx 
+            ON docflex_ticket (ticket_type)
+        """)
+        return res

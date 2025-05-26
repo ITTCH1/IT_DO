@@ -48,9 +48,25 @@
                     <field name="kanban_state" widget="state_selection"/>
                     <!-- <field name="use_sla" invisible="1"/> -->
                     <field name="fold" invisible="1"/>
-                    <div class="oe_title">
-                        <h1><field name="name" options="{'line_breaks': False}" widget="text" class="field_name" placeholder="e.g. Product arrived damaged"/></h1>
+
+                    <div class="row justify-content-between position-relative w-100 m-0 mb-2">
+                        <div class="oe_title mw-75 ps-0 pe-2">
+                            
+                            <h1 class="d-flex flex-row align-items-center">
+                                <field name="name" options="{'line_breaks': False}" widget="text" class="field_name" placeholder="e.g. Product arrived damaged"
+                                    required="True" style="font-size: min(4vw, 2.6rem);"/>
+                            </h1>
+                            <h2><field name="number"/></h2>
+                        </div>
                     </div>
+
+                    <!-- <div class="oe_title">
+                        <h1><field name="name" options="{'line_breaks': False}" widget="text" class="field_name" placeholder="e.g. Product arrived damaged"/></h1>
+                        
+                    </div>
+                    <h2>
+                            <field name="number"/>
+                        </h2> -->
                     <!-- <div class="d-flex mb-4" invisible="not sla_status_ids" groups="docflex.group_use_sla">
                         <field name="sla_status_ids" widget="docflex_sla_many2many_tags" invisible="not use_sla" options="{'color_field': 'color', 'no_edit_color': True}" class="mb-0" readonly="1" groups="docflex.group_use_sla"/>
                         <div invisible="not sla_deadline or not use_sla" groups="docflex.group_use_sla" class="mx-2 text-muted d-inline-flex align-items-center h-100">
@@ -60,7 +76,7 @@
                     </div> -->
                     <group class="mb-0 mt-4">
                         <group>
-                            <field name="ticket_type" domain="[('code', '=', context.get('code'))]"/>
+                            <field name="ticket_type" domain="[('code', '=', context.get('code'))]" invisible="1"/>
                             <field name="ticket_section_id" />
                             <field name="ticket_date" />
                         </group>
@@ -159,41 +175,112 @@
   </record>
 
   <!-- Search View Enhanced -->
-    <!-- <record id="view_ticket_filter" model="ir.ui.view">
-        <field name="name">ticket.list.select</field>
+    <record id="view_docflex_ticket_search" model="ir.ui.view">
+        <field name="name">docflex.ticket.search.advanced</field>
         <field name="model">docflex.ticket</field>
         <field name="arch" type="xml">
-            <search string="بحث التذاكر">
-                <field name="note_number" string="رقم المذكرة"/>
-                <field name="subject" string="الموضوع" filter_domain="[('subject', 'ilike', self)]"/>
-                <field name="from_partner" string="العميل"/>
-                <field name="state" string="الحالة"/>
+            <search string="بحث المذكرات">
+                <!-- البحث السريع -->
+                <field name="number" string="الرقم التسلسلي" filter_domain="[('number', 'ilike', self)]"/>
+                <field name="name" string="الموضوع"/>
+                <field name="partner_from_id" string="الجهة المرسلة"/>
+                <field name="partner_to_id" string="الجهة المستقبلة"/>
+                <field name="topic" string="نص البيان"/>
                 
-                <filter string="تذاكر مفتوحة" name="open_tickets" domain="[('state','=','open')]"/>
-                <filter string="قيد المعالجة" name="in_progress_tickets" domain="[('state','=','in_progress')]"/>
-                <filter string="معلقة" name="pending_tickets" domain="[('state','=','pending')]"/>
+                <!-- الفلاتر الأساسية -->
+                <filter string="المذكرات النشطة" name="active" domain="[('active','=',True)]"/>
+                <filter string="المذكرات المؤرشفة" name="archived" domain="[('active','=',False)]"/>
+                <filter string="المذكرات المعلقة" name="blocked" domain="[('kanban_state','=','blocked')]"/>
                 
+                <!-- فلترة حسب التاريخ -->
+                <filter string="اليوم" name="today" domain="[('is_today','=',True)]"/>
+                <filter string="هذا الأسبوع" name="this_week" domain="[('is_this_week','=',True)]"/>
+                <filter string="هذا الشهر" name="this_month" domain="[('is_this_month','=',True)]"/>
+
+                <!-- فلترة متقدمة -->
                 <separator/>
                 
-                <group expand="0" string="تجميع حسب">
-                    <filter string="نوع التذكرة" name="group_by_type" context="{'group_by':'ticket_type'}"/>
-                    <filter string="القسم" name="group_by_section" context="{'group_by':'note_section'}"/>
-                    <filter string="درجة السرية" name="group_by_secret" context="{'group_by':'secret_degree'}"/>
-                    <filter string="الحالة" name="group_by_state" context="{'group_by':'state'}"/>
+                <group string="فلترة متقدمة">
+                    <filter name="filter_by_type" string="حسب النوع" context="{'group_by':'ticket_type'}"/>
+                    <filter name="filter_by_section" string="حسب القسم" context="{'group_by':'ticket_section_id'}"/>
+                    <filter name="filter_by_priority" string="حسب الأولوية" context="{'group_by':'ticket_priority_id'}"/>
+                    <filter name="filter_by_security" string="حسب السرية" context="{'group_by':'ticket_security_id'}"/>
+                    <filter name="filter_by_status" string="حسب الحالة" context="{'group_by':'ticket_status_id'}"/>
+                    <filter name="filter_by_stage" string="حسب المرحلة" context="{'group_by':'stage_id'}"/>
+                    <filter name="filter_by_department" string="حسب الإدارة" context="{'group_by':'department_id'}"/>
+                    <filter name="filter_by_user" string="حسب المستخدم" context="{'group_by':'user_id'}"/>
+                </group>
+                
+                <!-- حفظ عمليات البحث -->
+                <separator/>
+                <filter name="my_tickets" string="مذكراتي" domain="[('user_id','=',uid)]"/>
+                <filter name="my_department_tickets" string="مذكرات إدارتي" domain="[('department_id','=',uid)]"/>
+                
+                <!-- المجموعات الذكية -->
+                <group string="تجميع حسب">
+                    <filter name="group_by_year" string="حسب السنة" context="{'group_by': 'sequence_year'}"/>
+                    <filter name="group_by_month" string="حسب الشهر" context="{'group_by': 'ticket_month'}"/>
+                    <filter name="group_by_week" string="حسب الأسبوع" context="{'group_by': 'ticket_week'}"/>
                 </group>
             </search>
         </field>
-    </record> -->
+    </record>
+
+
+    <record id="view_docflex_ticket_pivot" model="ir.ui.view">
+        <field name="name">docflex.ticket.pivot</field>
+        <field name="model">docflex.ticket</field>
+        <field name="arch" type="xml">
+            <pivot string="تحليل المذكرات">
+                <field name="ticket_count" type="measure"/>
+
+                <!-- حسب قسم المذكرة -->
+                <field name="ticket_section_id"/>
+
+                <!-- حسب الإدارة -->
+                <field name="department_id"/>
+
+                <!-- حسب درجة الأولوية -->
+                <field name="ticket_priority_id"/>
+
+                <!-- حسب درجة السرية -->
+                <field name="ticket_security_id"/>
+
+                <!-- حسب المرحلة -->
+                <field name="stage_id"/>
+
+                <!-- حسب الوسوم -->
+                <field name="tag_ids"/>
+            </pivot>
+        </field>
+    </record>
+
+
+    <record id="view_docflex_ticket_graph" model="ir.ui.view">
+        <field name="name">docflex.ticket.graph</field>
+        <field name="model">docflex.ticket</field>
+        <field name="arch" type="xml">
+            <graph type="bar">
+                <field name="ticket_date" interval="month" type="row"/>
+                <field name="ticket_type" type="col"/>
+                <!-- <field name="number" type="measure"/> -->
+            </graph>
+        </field>
+    </record>
 
 
     <!-- Actions Enhanced -->
     <record id="action_incoming_memos" model="ir.actions.act_window">
         <field name="name">المذكرات الواردة</field>
         <field name="res_model">docflex.ticket</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">tree,form,kanban,pivot,graph</field>
         <field name="domain">[('ticket_type.code', '=', 'in')]</field>
-        <field name="context">{'code': 'in'}</field>
-        <!-- <field name="search_view_id" ref="view_ticket_filter"/> -->
+        <field name="context">{
+            'search_default_active': 1,
+            'search_default_group_by_stage': 1,
+            'code': 'in'
+        }</field>
+        <field name="search_view_id" ref="view_docflex_ticket_search"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">لا توجد مذكرة واردة</p>
         </field>
@@ -202,14 +289,20 @@
     <record id="action_outgoing_memos" model="ir.actions.act_window">
         <field name="name">المذكرات الصادرة</field>
         <field name="res_model">docflex.ticket</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">tree,form,kanban,pivot,graph</field>
         <field name="domain">[('ticket_type.code', '=', 'out')]</field>
-        <field name="context">{'code': 'out'}</field>
-        <!-- <field name="search_view_id" ref="view_ticket_filter"/> -->
+        <field name="context">{
+            'search_default_active': 1,
+            'search_default_group_by_section': 1,
+            'code': 'out'
+        }</field>
+        <field name="search_view_id" ref="view_docflex_ticket_search"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">لا توجد مذكرة صادرة</p>
         </field>
     </record>
+
+
 
     <menuitem id="docflex_main_menue" name="الاتصالات الادارية" sequence="1"/>
     <menuitem id="docflex_config_menue" name="التهيئة" parent="docflex_main_menue" sequence="4"/>
