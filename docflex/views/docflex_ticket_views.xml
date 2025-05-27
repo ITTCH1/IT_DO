@@ -79,6 +79,7 @@
                             <field name="ticket_type" domain="[('code', '=', context.get('code'))]" invisible="1"/>
                             <field name="ticket_section_id" />
                             <field name="ticket_date" />
+                            <field name="is_urgent" />
                         </group>
                         <group>
                             
@@ -302,9 +303,20 @@
         </field>
     </record>
 
+    <record id="docflex_ticket_action_main_tree" model="ir.actions.act_window">
+        <field name="name">المذكرات الرئيسية</field>
+        <field name="res_model">docflex.ticket</field>
+        <field name="view_mode">tree,form,kanban</field>
+        <field name="search_view_id" ref="view_docflex_ticket_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">لا توجد مذكرات</p>
+        </field>
+    </record>
 
 
-    <menuitem id="docflex_main_menue" name="الاتصالات الادارية" sequence="1"/>
+
+
+    <menuitem id="docflex_main_menue" name="الاتصالات الادارية" web_icon="docflex,static/src/img/ticket.png" sequence="1"/>
     <menuitem id="docflex_config_menue" name="التهيئة" parent="docflex_main_menue" sequence="4"/>
     <menuitem id="docflex_ticket_menue" name="العمليات" parent="docflex_main_menue" sequence="4"/>
 

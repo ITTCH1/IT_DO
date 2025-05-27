@@ -305,44 +305,77 @@ class DoflexTicket(models.Model):
             ticket.is_partner_phone_update = ticket._get_partner_phone_update()
 
     @api.model
+    def _get_default_stage(self):
+        """Get default stage based on ticket type"""
+        # البحث عن المرحلة الأولى من النوع 'جديد' أو إنشائها إذا لم توجد
+        stage = self.env['docflex.ticket.stage'].search([], order='sequence asc', limit=1)
+        if not stage:
+            stage = self.env['docflex.ticket.stage'].create({
+                'name': 'جديد',
+                'sequence': 1,
+                'is_starting': True,
+            })
+        return stage.id
+
+    @api.model
+    def _get_default_stage(self):
+        """Get default stage based on ticket type"""
+        # البحث عن المرحلة الأولى من النوع 'جديد' أو إنشائها إذا لم توجد
+        stage = self.env['docflex.ticket.stage'].search([], order='sequence asc', limit=1)
+        if not stage:
+            template = self.env.ref('docflex.email_template_docflex_ticket_default', raise_if_not_found=False)
+            stage = self.env['docflex.ticket.stage'].create({
+                'name': 'جديد',
+                'sequence': 1,
+                'is_starting': True,
+                'template_id': template.id if template else False,
+            })
+        return stage.id
+
+    @api.model
     def create(self, vals):
-        # 1. تعيين معلومات المستخدم (الوظيفة الأصلية)
+        # 1. تعيين معلومات المستخدم
         user = self.env.user
         vals.update({
             'user_id': user.id,
             'user_name': user.name,
         })
         
-        # 2. تعيين القسم من الموظف (الوظيفة الأصلية)
+        # 2. تعيين القسم من الموظف
         employee = self.env['hr.employee'].search([('user_id', '=', user.id)], limit=1)
         if employee and employee.department_id:
             vals['department_id'] = employee.department_id.id
         
-        # 3. توليد الرقم التسلسلي (الوظيفة الجديدة)
+        # 3. تعيين المرحلة الافتراضية إذا لم يتم تحديدها
+        if 'stage_id' not in vals or not vals.get('stage_id'):
+            vals['stage_id'] = self._get_default_stage()
+        
+        # 4. توليد الرقم التسلسلي
         if vals.get('number', _('New')) == _('New'):
-            # إنشاء كائن مؤقت للحصول على القيم المطلوبة للتسلسل
             temp_vals = vals.copy()
-            
-            # تعيين القيم الافتراضية إذا لم يتم توفيرها
             if 'company_id' not in temp_vals:
                 temp_vals['company_id'] = self.env.company.id
-            
             temp_ticket = self.new(temp_vals)
             vals['number'] = temp_ticket._get_next_number()
         
-        # 4. التأكد من وجود القيم المطلوبة قبل الإنشاء
+        # 5. التأكد من وجود القيم المطلوبة
         required_fields = ['ticket_type', 'ticket_section_id']
         for field in required_fields:
             if field not in vals:
                 raise ValidationError(_("حقل %s مطلوب لإنشاء المذكرة") % field)
         
-        # 5. إنشاء المذكرة
+        # 6. إنشاء المذكرة
         ticket = super(DoflexTicket, self).create(vals)
         
-        # 6. تسجيل في السجل (اختياري)
+        # 7. تسجيل في السجل
         ticket.message_post(body=_("تم إنشاء المذكرة برقم %s") % ticket.number)
+
+            # إرسال البريد الإلكتروني إذا كان هناك قالب مرتبط بالمرحلة
+        if ticket.stage_id.template_id:
+            ticket.stage_id.template_id.send_mail(ticket.id, force_send=True)
         
         return ticket
+
     # @api.depends('team_id')
     # def _compute_user_and_stage_ids(self):
     #     for ticket in self.filtered(lambda ticket: ticket.team_id):
@@ -414,3 +447,10 @@ class DoflexTicket(models.Model):
             ON docflex_ticket (ticket_type)
         """)
         return res
+
+    is_urgent = fields.Boolean(compute='_compute_is_urgent', store=True)
+
+    @api.depends('ticket_priority_id')
+    def _compute_is_urgent(self):
+        for rec in self:
+            rec.is_urgent = rec.ticket_priority_id.name == 'عاجل'

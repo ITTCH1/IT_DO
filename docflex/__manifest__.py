@@ -26,6 +26,7 @@
 
     # always loaded
     'data': [
+        'data/email_templates.xml',
         'security/docflex_security.xml',
         'security/ir.model.access.csv',
         'views/docflex_ticket_views.xml',
