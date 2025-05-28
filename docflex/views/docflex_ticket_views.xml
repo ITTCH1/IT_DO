@@ -7,6 +7,9 @@
             <form string="docflex Ticket">
                 <header>
                     <field name="stage_id" widget="statusbar_duration" options="{'clickable': '1', 'fold_field': 'fold'}"/>
+    
+                    <button name="action_mark_waiting_archive" type="object" string="طلب أرشفة" class="btn btn-outline-secondary"
+                        invisible="wait_archive == True" />
                 </header>
                 <sheet>
                     <field name="legend_blocked" invisible="1"/>
@@ -119,6 +122,7 @@
                             <field name="folder_id" />
                             <!-- <field name="topic" /> -->
                             <!-- <field name="ticket_status_id" /> -->
+                            <field name="wait_archive" invisible="wait_archive == False" readonly="1"/>
                         </group>
                          <group>
                             <field name="note" />
@@ -171,6 +175,7 @@
         <field name="stage_id" optional="show"/>
         <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" optional="show"/>
         <field name="user_id" optional="hide"/>
+        
       </tree>
     </field>
   </record>
@@ -191,6 +196,7 @@
                 <!-- الفلاتر الأساسية -->
                 <filter string="المذكرات النشطة" name="active" domain="[('active','=',True)]"/>
                 <filter string="المذكرات المؤرشفة" name="archived" domain="[('active','=',False)]"/>
+                <filter string="بانتظار الأرشفة" name="waiting_archive" domain="[('hgh','=',True)]"/>
                 <filter string="المذكرات المعلقة" name="blocked" domain="[('kanban_state','=','blocked')]"/>
                 
                 <!-- فلترة حسب التاريخ -->

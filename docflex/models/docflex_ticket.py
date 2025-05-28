@@ -86,9 +86,6 @@ class DoflexTicket(models.Model):
         comodel_name='ticket.classification',
         ondelete='restrict',
     )
-        # , domain="[('team_ids', '=', team_id)]"
-        #   compute='_compute_user_and_stage_ids',
-        #   group_expand='_read_group_stage_ids',
     stage_id = fields.Many2one(
         'docflex.ticket.stage', string='المرحلة',
           store=True,
@@ -158,6 +155,11 @@ class DoflexTicket(models.Model):
     is_this_week = fields.Boolean(compute="_compute_date_flags", store=True)
     is_this_month = fields.Boolean(compute="_compute_date_flags", store=True)
 
+
+    request_archive_by = fields.Many2one('res.users', string="طلب الأرشفة بواسطة", readonly=True)
+    request_archive_date = fields.Datetime(string="تاريخ طلب الأرشفة", readonly=True)
+
+
     @api.depends('ticket_date')
     def _compute_date_flags(self):
         today = fields.Date.today()
@@ -167,6 +169,33 @@ class DoflexTicket(models.Model):
             rec.is_this_month = rec.ticket_date.month == today.month and rec.ticket_date.year == today.year if rec.ticket_date else False
 
 
+    def action_mark_waiting_archive(self):
+        for ticket in self:
+            ticket.wait_archive = True
+            ticket.request_archive_by = self.env.user
+            ticket.request_archive_date = fields.Datetime.now()
+
+            # سجل في المحادثات
+            ticket.message_post(
+                body=_("📦 تم طلب أرشفة المذكرة من قبل: <b>%s</b> في <i>%s</i>") % (
+                    ticket.request_archive_by.name,
+                    ticket.request_archive_date.strftime('%Y-%m-%d %H:%M')
+                )
+            )
+
+            # إرسال تنبيه إلى مدير القسم
+            if ticket.department_id and ticket.department_id.manager_id and ticket.department_id.manager_id.user_id:
+                manager_user = ticket.department_id.manager_id.user_id
+                ticket.activity_schedule(
+                    'mail.mail_activity_data_todo',
+                    user_id=manager_user.id,
+                    summary='طلب أرشفة جديد',
+                    note=_("المستخدم <b>%s</b> طلب أرشفة المذكرة رقم <b>%s</b> في التاريخ <i>%s</i>.") % (
+                        ticket.request_archive_by.name,
+                        ticket.number,
+                        ticket.request_archive_date.strftime('%Y-%m-%d %H:%M')
+                    )
+                )
 
 
     @api.depends('ticket_date')
@@ -304,23 +333,22 @@ class DoflexTicket(models.Model):
         for ticket in self:
             ticket.is_partner_phone_update = ticket._get_partner_phone_update()
 
-    @api.model
-    def _get_default_stage(self):
-        """Get default stage based on ticket type"""
-        # البحث عن المرحلة الأولى من النوع 'جديد' أو إنشائها إذا لم توجد
-        stage = self.env['docflex.ticket.stage'].search([], order='sequence asc', limit=1)
-        if not stage:
-            stage = self.env['docflex.ticket.stage'].create({
-                'name': 'جديد',
-                'sequence': 1,
-                'is_starting': True,
-            })
-        return stage.id
+    
+    # def action_archive_ticket(self):
+    #     for ticket in self:
+    #         ticket.active = False
+    #         ticket.archive = True  # استخدام منطقي للحقل المخصص
+    #         ticket.wait_archive = False
+    #         ticket.message_post(body="✅ تم أرشفة المذكرة.")
+
+    # def action_restore_ticket(self):
+    #     for ticket in self:
+    #         ticket.active = True
+    #         ticket.archive = False
+    #         ticket.message_post(body="✅ تم استرجاع المذكرة من الأرشيف.")
 
     @api.model
     def _get_default_stage(self):
-        """Get default stage based on ticket type"""
-        # البحث عن المرحلة الأولى من النوع 'جديد' أو إنشائها إذا لم توجد
         stage = self.env['docflex.ticket.stage'].search([], order='sequence asc', limit=1)
         if not stage:
             template = self.env.ref('docflex.email_template_docflex_ticket_default', raise_if_not_found=False)
@@ -332,6 +360,7 @@ class DoflexTicket(models.Model):
             })
         return stage.id
 
+    
     @api.model
     def create(self, vals):
         # 1. تعيين معلومات المستخدم
@@ -376,35 +405,6 @@ class DoflexTicket(models.Model):
         
         return ticket
 
-    # @api.depends('team_id')
-    # def _compute_user_and_stage_ids(self):
-    #     for ticket in self.filtered(lambda ticket: ticket.team_id):
-    #         if not ticket.user_id:
-    #             ticket.user_id = ticket.team_id._determine_user_to_assign()[ticket.team_id.id]
-    #         if not ticket.stage_id or ticket.stage_id not in ticket.team_id.stage_ids:
-    #             ticket.stage_id = ticket.team_id._determine_stage()[ticket.team_id.id]
-    
-    # @api.model
-    # def _read_group_stage_ids(self, stages, domain, order):
-    #     # write the domain
-    #     # - ('id', 'in', stages.ids): add columns that should be present
-    #     # - OR ('team_ids', '=', team_id) if team_id: add team columns
-    #     search_domain = [('id', 'in', stages.ids)]
-    #     if self.env.context.get('default_team_id'):
-    #         search_domain = ['|', ('team_ids', 'in', self.env.context['default_team_id'])] + search_domain
-
-    #     return stages.search(search_domain, order=order)
-    
-    
-    
-
-    # sla_ids = fields.Many2many(
-    #     'sla.model',
-    #     'docflex_ticket_sla_rel',  # Unique relation table name
-    #     'ticket_id', 
-    #     'sla_id', 
-    #     string="SLAs"
-    # )
     @api.depends('stage_id', 'kanban_state')
     def _compute_kanban_state_label(self):
         for ticket in self:
@@ -416,9 +416,6 @@ class DoflexTicket(models.Model):
                 ticket.kanban_state_label = ticket.legend_done
 
     
-    # Add your fields here
-    # name = fields.Char(string='Ticket Name', required=True)
-    # ticket_number = fields.Char(string='Ticket Number', required=True)
 
     def action_open_docflex_ticket(self):
         self.ensure_one()
@@ -432,6 +429,7 @@ class DoflexTicket(models.Model):
         return action
 
     # إضافة فهارس لتحسين أداء البحث
+    
     def _auto_init(self):
         res = super(DoflexTicket, self)._auto_init()
         self._cr.execute("""
@@ -446,7 +444,25 @@ class DoflexTicket(models.Model):
             CREATE INDEX IF NOT EXISTS docflex_ticket_type_idx 
             ON docflex_ticket (ticket_type)
         """)
+        self._cr.execute("""
+            CREATE INDEX IF NOT EXISTS docflex_ticket_section_idx 
+            ON docflex_ticket (ticket_section_id)
+        """)
+        self._cr.execute("""
+            CREATE INDEX IF NOT EXISTS docflex_ticket_status_idx 
+            ON docflex_ticket (ticket_status_id)
+        """)
+        self._cr.execute("""
+            CREATE INDEX IF NOT EXISTS docflex_ticket_priority_idx 
+            ON docflex_ticket (ticket_priority_id)
+        """)
+        self._cr.execute("""
+            CREATE INDEX IF NOT EXISTS docflex_ticket_security_idx 
+            ON docflex_ticket (ticket_security_id)
+        """)
         return res
+
+
 
     is_urgent = fields.Boolean(compute='_compute_is_urgent', store=True)
 
