@@ -25,5 +25,9 @@ class TicketPriority(models.Model):
 
     color = fields.Integer(_('اللون'),default=_get_default_color)
 
-    
+    priority_count = fields.Integer(compute="_compute_priority_count")
+    def _compute_priority_count(self):
+        priority_obj = self.env['docflex.ticket']   
+        for ticket in self:
+            ticket.priority_count = priority_obj.search_count([('ticket_priority_id', '=', ticket.id)]) 
     
