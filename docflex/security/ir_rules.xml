@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="ticket_department_rule" model="ir.rule">
+        <field name="name">عرض مذكرات الإدارة فقط</field>
+        <!-- استبدل model_ticket_model بالمرجع الصحيح لنموذجك -->
+        <field name="model_id" ref="model_docflex_ticket"/>
+        <field name="domain_force">
+            ['|', ('department_id','=',False),
+                  ('department_id','=', user.department_id.id)]
+        </field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+</odoo>

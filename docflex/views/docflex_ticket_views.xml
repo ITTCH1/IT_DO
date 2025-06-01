@@ -81,6 +81,7 @@
                         <group>
                             <field name="ticket_type" domain="[('code', '=', context.get('code'))]" invisible="1"/>
                             <field name="ticket_section_id" />
+                            <field name="department_id" />
                             <field name="ticket_date" />
                             <field name="is_urgent" />
                         </group>
@@ -194,9 +195,9 @@
                 <field name="topic" string="نص البيان"/>
                 
                 <!-- الفلاتر الأساسية -->
-                <filter string="المذكرات النشطة" name="active" domain="[('active','=',True)]"/>
+                <filter string="المذكرات النشطة" name="active" domain="[('active','=',True), ('wait_archive','=',False)]"/>
                 <filter string="المذكرات المؤرشفة" name="archived" domain="[('active','=',False)]"/>
-                <filter string="بانتظار الأرشفة" name="waiting_archive" domain="[('hgh','=',True)]"/>
+                <filter string="بانتظار الأرشفة" name="wait_archive" domain="[('wait_archive','=',True)]"/>
                 <filter string="المذكرات المعلقة" name="blocked" domain="[('kanban_state','=','blocked')]"/>
                 
                 <!-- فلترة حسب التاريخ -->
@@ -222,6 +223,8 @@
                 <separator/>
                 <filter name="my_tickets" string="مذكراتي" domain="[('user_id','=',uid)]"/>
                 <filter name="my_department_tickets" string="مذكرات إدارتي" domain="[('department_id','=',uid)]"/>
+                <filter name="all_department_tickets" string="جميع المذكرات بالإدارات"
+                    domain="[('department_id','!=',False)]"/>
                 
                 <!-- المجموعات الذكية -->
                 <group string="تجميع حسب">

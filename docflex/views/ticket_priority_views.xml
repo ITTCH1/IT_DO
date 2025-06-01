@@ -21,11 +21,7 @@
         <field name="arch" type="xml">
             <form string="أولوليات المذكرات">
                 <sheet>
-                    <div class="oe_button_box" name="button_box">
-                        <button class="oe_stat_button" name="%(action_docflex_ticket_priority)d" type="action" context="{'search_default_ticket_priority_id': active_id}">
-                            <field string="Tickets" name="priority_count" widget="statinfo"/>
-                        </button>
-                    </div>
+                    
                     <group>
                         <group>
                             <field name="name"/>

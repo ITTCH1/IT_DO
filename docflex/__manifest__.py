@@ -9,7 +9,7 @@
     'website': "https://www.yourcompany.com",
     'category': 'Uncategorized',
     'module_type':'official',
-    'version': '17.0.1.0.0',
+    'version': '17.0.1.0.1',
     # any module necessary for this one to work correctly
     'depends': ['base','hr','mail',
                 'website',
@@ -26,8 +26,10 @@
 
     # always loaded
     'data': [
+        'data/data.xml',
         'data/email_templates.xml',
         'security/docflex_security.xml',
+        'security/ir_rules.xml',
         'security/ir.model.access.csv',
         'views/docflex_ticket_views.xml',
         'views/ticket_classification_views.xml',
@@ -53,6 +55,9 @@
         'web.qunit_suite_tests': [
         ],
     },
+    'post_init_hook': 'post_init_hook',
+    'uninstall_hook': 'uninstall_hook',
+
     'installable':True,
     'application':True,
     'license':'LGPL-3',

@@ -15,9 +15,9 @@ class DoflexTicket(models.Model):
   
     _description = 'المذكرات'
     _track_duration_field = 'stage_id'
-    _sql_constraints = [
-    ('number_unique', 'UNIQUE(number)', 'الرقم التسلسلي يجب أن يكون فريدًا!'),
-]
+#     _sql_constraints = [
+#     ('number_unique', 'UNIQUE(number)', 'الرقم التسلسلي يجب أن يكون فريدًا!'),
+# ]
     
     name = fields.Char(string='الموضوع', required=True, index=True, tracking=True)
 
@@ -169,6 +169,34 @@ class DoflexTicket(models.Model):
             rec.is_this_month = rec.ticket_date.month == today.month and rec.ticket_date.year == today.year if rec.ticket_date else False
 
 
+    # def action_mark_waiting_archive(self):
+    #     for ticket in self:
+    #         ticket.wait_archive = True
+    #         ticket.request_archive_by = self.env.user
+    #         ticket.request_archive_date = fields.Datetime.now()
+
+    #         # سجل في المحادثات
+    #         ticket.message_post(
+    #             body=_("📦 تم طلب أرشفة المذكرة من قبل: <b>%s</b> في <i>%s</i>") % (
+    #                 ticket.request_archive_by.name,
+    #                 ticket.request_archive_date.strftime('%Y-%m-%d %H:%M')
+    #             )
+    #         )
+
+    #         # إرسال تنبيه إلى مدير القسم
+    #         if ticket.department_id and ticket.department_id.manager_id and ticket.department_id.manager_id.user_id:
+    #             manager_user = ticket.department_id.manager_id.user_id
+    #             ticket.activity_schedule(
+    #                 'mail.mail_activity_data_todo',
+    #                 user_id=manager_user.id,
+    #                 summary='طلب أرشفة جديد',
+    #                 note=_("المستخدم <b>%s</b> طلب أرشفة المذكرة رقم <b>%s</b> في التاريخ <i>%s</i>.") % (
+    #                     ticket.request_archive_by.name,
+    #                     ticket.number,
+    #                     ticket.request_archive_date.strftime('%Y-%m-%d %H:%M')
+    #                 )
+    #             )
+
     def action_mark_waiting_archive(self):
         for ticket in self:
             ticket.wait_archive = True
@@ -190,11 +218,20 @@ class DoflexTicket(models.Model):
                     'mail.mail_activity_data_todo',
                     user_id=manager_user.id,
                     summary='طلب أرشفة جديد',
-                    note=_("المستخدم <b>%s</b> طلب أرشفة المذكرة رقم <b>%s</b> في التاريخ <i>%s</i>.") % (
-                        ticket.request_archive_by.name,
-                        ticket.number,
-                        ticket.request_archive_date.strftime('%Y-%m-%d %H:%M')
-                    )
+                    note=_("""\
+                        <div style='margin:10px;'>
+                            <h3 style='color:#875A7B;'>طلب أرشفة جديد</h3>
+                            <p><b>المستخدم:</b> %s</p>
+                            <p><b>رقم المذكرة:</b> %s</p>
+                            <p><b>موضوع المذكرة:</b> %s</p>
+                            <p><b>تاريخ الطلب:</b> %s</p>
+                        </div>
+                        """) % (
+                            ticket.request_archive_by.name,
+                            ticket.number,
+                            ticket.name,
+                            ticket.request_archive_date.strftime('%Y-%m-%d %H:%M')
+                        )
                 )
 
 
@@ -236,36 +273,71 @@ class DoflexTicket(models.Model):
             else:
                 record.sequence_year = fields.Date.today().strftime('%Y')
 
+    # @api.model
+    # def _get_next_number(self):
+    #     """Generate next number based on ticket type, section and creation date"""
+    #     today = fields.Date.today()
+    #     year = today.strftime('%Y')
+        
+    #     if not self.ticket_type or not self.ticket_section_id:
+    #         return _('New')
+            
+    #     # بناء اسم التسلسل الديناميكي
+    #     sequence_code = f"docflex.ticket.{self.ticket_type.code}.{self.ticket_section_id.code or 'default'}.{year}"
+        
+    #     # البحث عن التسلسل أو إنشائه إذا لم يوجد
+    #     sequence = self.env['ir.sequence'].search([
+    #         ('code', '=', sequence_code),
+    #         ('company_id', '=', self.company_id.id)
+    #     ], limit=1)
+        
+    #     if not sequence:
+    #         sequence = self.env['ir.sequence'].create({
+    #             'name': f'Ticket Sequence - {self.ticket_type.name} - {self.ticket_section_id.name} - {year}',
+    #             'code': sequence_code,
+    #             'prefix': f"{self.ticket_type.code}/{self.ticket_section_id.code or 'GEN'}/%(year)s/",
+    #             'padding': 4,
+    #             'number_next': 1,
+    #             'number_increment': 1,
+    #             'company_id': self.company_id.id,
+    #         })
+        
+    #     return sequence.next_by_id()
+
     @api.model
     def _get_next_number(self):
-        """Generate next number based on ticket type, section and creation date"""
+        """Generate next number based on ticket type, section, year, and user (hidden in code only)"""
         today = fields.Date.today()
         year = today.strftime('%Y')
-        
+
         if not self.ticket_type or not self.ticket_section_id:
             return _('New')
-            
-        # بناء اسم التسلسل الديناميكي
-        sequence_code = f"docflex.ticket.{self.ticket_type.code}.{self.ticket_section_id.code or 'default'}.{year}"
-        
-        # البحث عن التسلسل أو إنشائه إذا لم يوجد
-        sequence = self.env['ir.sequence'].search([
+
+        user_id = self.env.user.id
+
+        # 💡 التسلسل خاص بكل (نوع + قسم + سنة + مستخدم) لكن بدون إظهار اسم المستخدم
+        sequence_code = f"docflex.ticket.{self.ticket_type.code}.{self.ticket_section_id.code or 'default'}.{year}.{user_id}"
+
+        # 🔍 البحث عن التسلسل أو إنشائه
+        sequence = self.env['ir.sequence'].sudo().search([
             ('code', '=', sequence_code),
             ('company_id', '=', self.company_id.id)
         ], limit=1)
-        
+
         if not sequence:
-            sequence = self.env['ir.sequence'].create({
-                'name': f'Ticket Sequence - {self.ticket_type.name} - {self.ticket_section_id.name} - {year}',
+            sequence = self.env['ir.sequence'].sudo().create({
+                'name': f'Ticket Sequence - {self.ticket_type.name} - {self.ticket_section_id.name} - {year} - User {user_id}',
                 'code': sequence_code,
-                'prefix': f"{self.ticket_type.code}/{self.ticket_section_id.code or 'GEN'}/%(year)s/",
+                'prefix': f"{self.ticket_type.code}/{self.ticket_section_id.code or 'GEN'}/{year}/",
                 'padding': 4,
                 'number_next': 1,
                 'number_increment': 1,
                 'company_id': self.company_id.id,
             })
-        
+
         return sequence.next_by_id()
+
+
 
     @api.model
     def _get_default_ticket_type(self):
@@ -370,9 +442,11 @@ class DoflexTicket(models.Model):
             'user_name': user.name,
         })
         
-        # 2. تعيين القسم من الموظف
-        employee = self.env['hr.employee'].search([('user_id', '=', user.id)], limit=1)
-        if employee and employee.department_id:
+        #  فقط عيّن القسم إذا لم يكن قد تم تمريره من `default_get`
+        if not vals.get('department_id'):
+            employee = self.env['hr.employee'].search([('user_id', '=', user.id)], limit=1)
+            if not employee or not employee.department_id:
+                raise ValidationError(_("لا يمكنك إنشاء مذكرة لأنك غير مرتبط بقسم. الرجاء التواصل مع مدير النظام."))
             vals['department_id'] = employee.department_id.id
         
         # 3. تعيين المرحلة الافتراضية إذا لم يتم تحديدها
@@ -404,6 +478,17 @@ class DoflexTicket(models.Model):
             ticket.stage_id.template_id.send_mail(ticket.id, force_send=True)
         
         return ticket
+
+
+
+    @api.model
+    def default_get(self, fields):
+        res = super().default_get(fields)
+        employee = self.env['hr.employee'].search([('user_id', '=', self.env.user.id)], limit=1)
+        if employee and employee.department_id:
+            res['department_id'] = employee.department_id.id
+        return res
+
 
     @api.depends('stage_id', 'kanban_state')
     def _compute_kanban_state_label(self):
